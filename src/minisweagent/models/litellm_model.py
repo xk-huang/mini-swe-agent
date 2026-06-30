@@ -24,11 +24,46 @@ from minisweagent.models.utils.retry import retry
 logger = logging.getLogger("litellm_model")
 
 
+class AzureADTokenProviderConfig(BaseModel):
+    scope: str
+    credentials: list[Literal["azure_cli", "managed_identity", "default"]] = ["default"]
+
+
+def _make_azure_ad_token_provider(
+    config: AzureADTokenProviderConfig, model_kwargs: dict[str, Any]
+) -> Callable[[], str]:
+    conflicts = {"api_key", "azure_ad_token_provider"} & model_kwargs.keys()
+    if conflicts:
+        raise ValueError(f"Cannot configure azure_ad_token_provider with existing model_kwargs: {sorted(conflicts)}")
+    try:
+        from azure.identity import (
+            AzureCliCredential,
+            ChainedTokenCredential,
+            DefaultAzureCredential,
+            ManagedIdentityCredential,
+            get_bearer_token_provider,
+        )
+    except ImportError as e:
+        raise ImportError("Install Azure auth support with `pip install 'mini-swe-agent[azure]'`.") from e
+
+    credential_classes = {
+        "azure_cli": AzureCliCredential,
+        "managed_identity": ManagedIdentityCredential,
+        "default": DefaultAzureCredential,
+    }
+    credentials = [credential_classes[name]() for name in config.credentials]
+    return get_bearer_token_provider(
+        credentials[0] if len(credentials) == 1 else ChainedTokenCredential(*credentials), config.scope
+    )
+
+
 class LitellmModelConfig(BaseModel):
     model_name: str
     """Model name. Highly recommended to include the provider in the model name, e.g., `anthropic/claude-sonnet-4-5-20250929`."""
     model_kwargs: dict[str, Any] = {}
     """Additional arguments passed to the API."""
+    azure_ad_token_provider: AzureADTokenProviderConfig | None = None
+    """Configure Azure Entra ID authentication for LiteLLM."""
     litellm_model_registry: Path | str | None = os.getenv("LITELLM_MODEL_REGISTRY_PATH")
     """Model registry for cost tracking and model metadata. See the local model guide (https://mini-swe-agent.com/latest/models/local_models/) for more details."""
     set_cache_control: Literal["default_end"] | None = None
@@ -58,6 +93,10 @@ class LitellmModel:
 
     def __init__(self, *, config_class: Callable = LitellmModelConfig, **kwargs):
         self.config = config_class(**kwargs)
+        if self.config.azure_ad_token_provider:
+            self.config.model_kwargs["azure_ad_token_provider"] = _make_azure_ad_token_provider(
+                self.config.azure_ad_token_provider, self.config.model_kwargs
+            )
         if self.config.litellm_model_registry and Path(self.config.litellm_model_registry).is_file():
             litellm.utils.register_model(json.loads(Path(self.config.litellm_model_registry).read_text()))
 

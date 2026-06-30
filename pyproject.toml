@@ -53,11 +53,16 @@ full = [
     "swe-rex>=1.4.0",
     "mini-swe-agent[modal]",
     "mini-swe-agent[contree]",
+    "mini-swe-agent[azure]",
 ]
 
 modal = [
     "modal",
     "boto3",
+]
+
+azure = [
+    "azure-identity",
 ]
 
 dev = [

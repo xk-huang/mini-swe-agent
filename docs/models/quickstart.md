@@ -194,6 +194,29 @@ Here's a few general examples:
     See [this guide](local_models.md) for more details on local models.
     In particular, you need to configure token costs for local models.
 
+=== "Azure Entra ID"
+
+    If you cannot use an Azure API key, install the optional Azure auth dependencies:
+
+    ```bash
+    pip install "mini-swe-agent[azure]"
+    ```
+
+    Then configure a token provider. For example, for an Azure v1/OpenAI-compatible endpoint:
+
+    ```yaml
+    model:
+      model_name: "azure/gpt-4o_2024-11-20"
+      azure_ad_token_provider:
+        scope: "api://trapi/.default"
+        credentials: ["azure_cli", "managed_identity"]
+      model_kwargs:
+        api_base: "https://trapi.research.microsoft.com/redmond/interactive"
+        api_version: "v1"
+        drop_params: true
+      cost_tracking: "ignore_errors"
+    ```
+
 Here are more examples of how to configure specific models:
 
 === "Gemini 3 (Openrouter)"
@@ -308,4 +331,3 @@ On top, there's a few more exotic model classes that you can use:
 As with the last two, you can also specify any import path to your own custom model class (even if it is not yet part of the mini-SWE-agent package).
 
 --8<-- "docs/_footer.md"
-
