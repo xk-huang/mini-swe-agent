@@ -93,9 +93,10 @@ class LitellmModel:
 
     def __init__(self, *, config_class: Callable = LitellmModelConfig, **kwargs):
         self.config = config_class(**kwargs)
+        self._model_kwargs = self.config.model_kwargs.copy()
         if self.config.azure_ad_token_provider:
-            self.config.model_kwargs["azure_ad_token_provider"] = _make_azure_ad_token_provider(
-                self.config.azure_ad_token_provider, self.config.model_kwargs
+            self._model_kwargs["azure_ad_token_provider"] = _make_azure_ad_token_provider(
+                self.config.azure_ad_token_provider, self._model_kwargs
             )
         if self.config.litellm_model_registry and Path(self.config.litellm_model_registry).is_file():
             litellm.utils.register_model(json.loads(Path(self.config.litellm_model_registry).read_text()))
@@ -106,7 +107,7 @@ class LitellmModel:
                 model=self.config.model_name,
                 messages=messages,
                 tools=[BASH_TOOL],
-                **(self.config.model_kwargs | kwargs),
+                **(self._model_kwargs | kwargs),
             )
         except litellm.exceptions.AuthenticationError as e:
             e.message += " You can permanently set your API key with `mini-extra config set KEY VALUE`."

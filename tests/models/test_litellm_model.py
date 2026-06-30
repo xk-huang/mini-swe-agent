@@ -84,8 +84,14 @@ class TestLitellmModel:
             cost_tracking="ignore_errors",
         )
 
-        assert callable(model.config.model_kwargs["azure_ad_token_provider"])
+        assert "azure_ad_token_provider" not in model.config.model_kwargs
+        assert callable(model._model_kwargs["azure_ad_token_provider"])
         assert model.config.model_kwargs["api_base"] == "https://trapi.research.microsoft.com/redmond/interactive"
+        assert model.serialize()["info"]["config"]["model"]["model_kwargs"] == {
+            "api_base": "https://trapi.research.microsoft.com/redmond/interactive",
+            "api_version": "v1",
+            "drop_params": True,
+        }
         assert calls == [
             ("chain", ["AzureCliCredential", "ManagedIdentityCredential"]),
             ("provider", "ChainedTokenCredential", "api://trapi/.default"),
